@@ -1,0 +1,1 @@
+NetworkX est utilisée pour manipuler des graphes (réseaux) en Python, ce qui permet de représenter des relations comme celles entre des salles et tunnels d’une fourmilière
