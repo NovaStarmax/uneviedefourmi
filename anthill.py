@@ -1,4 +1,6 @@
+from itertools import cycle
 import networkx as nx
+import matplotlib.pyplot as plt
 
 class Anthill: 
     def __init__(self, rooms, tunnels, capacities):
@@ -42,22 +44,53 @@ def initialize_anthill(file: str):
         capacities.setdefault(s, 1)
     return nb_ants, list(rooms), tunnels, capacities
 
-def is_valid_room(room, ants, capacity) -> bool:
-    occupied = sum(f.position == room for f in ants)
+def is_valid_room(room, ants, capacity):
+    # compte combien de fourmis sont déjà dans la salle
+    occupied = sum(1 for f in ants if f.position == room)
     return occupied < capacity
 
-def get_steps_paths(anthill, ants):
+def get_steps_paths(anthill, ants, max_paths=5):
+    all_paths = list(nx.shortest_simple_paths(anthill.graph, "Sv", "Sd"))
+    if len(all_paths) > max_paths:
+        all_paths = all_paths[:max_paths]
+
+    assignments = {}
+    for i, ant in enumerate(ants):
+        assignments[ant] = all_paths[i % len(all_paths)]
+
     steps = []
     while any(f.position != "Sd" for f in ants):
         movements = []
-        for f in ants: 
-            if f.position == "Sd":
+        # Pour chaque étape, on re-calcule la salle occupée pour vérifier la capacité
+        occupied_rooms = {room: 0 for room in anthill.capacities.keys()}
+        for f in ants:
+            if f.position != "Sd":
+                occupied_rooms[f.position] += 1
+
+        for ant in ants:
+            if ant.position == "Sd":
                 continue
-            path = nx.shortest_path(anthill.graph, f.position, "Sd")
-            if len(path) >= 2:
-                next_room=path[1]
-                if is_valid_room(next_room,ants,anthill.capacities[next_room]):
-                    movements.append(f"{f.name}_{f.id}-{f.position}-{next_room}")
-                    f.position = next_room
+            path = assignments[ant]
+            if ant.position not in path:
+                ant.position = path[0]
+                movements.append(f"{ant.name}_{ant.id}-{ant.position}-{ant.position}")
+                continue
+            pos_index = path.index(ant.position)
+            next_room = None
+            if pos_index + 1 < len(path):
+                candidate = path[pos_index + 1]
+                # Vérifier capacité et présence dans occupied_rooms
+                if occupied_rooms[candidate] < anthill.capacities[candidate]:
+                    next_room = candidate
+
+            if next_room:
+                movements.append(f"{ant.name}_{ant.id}-{ant.position}-{next_room}")
+                occupied_rooms[ant.position] -= 1
+                occupied_rooms[next_room] += 1
+                ant.position = next_room
+            else:
+                movements.append(f"{ant.name}_{ant.id}-{ant.position}-{ant.position}")
+
         steps.append(movements)
+
     return steps
